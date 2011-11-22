@@ -18,3 +18,8 @@ Usage
                                         (assume it is a partial file with no body
                                         tag).
 
+Quick Example
+-------------
+
+    ./html.py --css=default.css --title="PrettyMe README" README.md > README.html
+
