@@ -7,13 +7,17 @@ from getopt import getopt, GetoptError
 import markdown
 
 usage_message = \
-'''usage: build.py --css=style.css file.md'''
+'''usage: html.py --css=style.css file.md'''
 
 extended_message = \
 '''Options
     -h, help                      print this message
     -t, title=[title]             give the html page a title
     -c, css=[file]                give the location of the CSS to include
+    -s, stdin                     read from stdin instead of file
+    -H, html                      treat the file as html instead of markdown
+                                    (assume it is a partial file with no body
+                                    tag).
 '''
 
 error_codes = {
