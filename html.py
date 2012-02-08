@@ -85,7 +85,8 @@ def main(args):
         usage(error_codes['option'])
 
     title = 'A Page'
-    css = None
+    css = os.path.join(os.path.dirname(__file__), 'default.css')
+    assert os.path.exists(css)
     html = False
     stdin = False
     for opt, arg in opts:
@@ -123,8 +124,9 @@ def main(args):
             usage(error_codes['file_not_found'])
         with open(file_path, 'r') as f:
             text = f.read().strip()
+    text = text.decode('utf8')
     print header(title, css)
-    print body(text, mark=(not html))
+    print body(text, mark=(not html)).encode('utf8')
 
 if __name__ == '__main__':
     main(sys.argv[1:])
