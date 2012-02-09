@@ -44,7 +44,8 @@ def touch(fname, times = None):
 def latex_header():
     return '''
 \\documentclass[12pt]{article}
-\\usepackage[margin=1.2in]{geometry}
+\\usepackage[margin=0.8in]{geometry}
+\\usepackage{enumerate}
 
 
 \\begin{document}
@@ -61,8 +62,17 @@ def latex(text):
                               stderr=subprocess.PIPE)
     out, err = pandoc.communicate(text)
     if pandoc.returncode != 0:
-        raise RuntimeError, pandoc.err
+        raise RuntimeError, err
     return out
+
+def pdflatex(path):
+    pdflatex = subprocess.Popen(['pdflatex', path],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = pdflatex.communicate()
+    log(out)
+    log(err)
+    if pdflatex.returncode != 0:
+        raise RuntimeError, (out, err)
 
 def main(args):
     try:
@@ -100,23 +110,31 @@ def main(args):
         with open(file_path, 'r') as f:
             text = f.read().strip()
     
-    text = text.decode('utf8')
+    text = text.decode('utf8').encode('utf8')
     latex_text = latex_header() + latex(text) + latex_footer()
-    
-    tmpdir = tempfile.mkdtemp()
+    #output(latex_text)
+    #sys.exit(0)
+   
+    tmpdir = '/tmp/testing' #tempfile.mkdtemp()
+    os.chdir(tmpdir)
     texfile = os.path.join(tmpdir, 'page.tex')
     pdffile = os.path.join(tmpdir, 'page.pdf')
+    auxfile = os.path.join(tmpdir, 'page.aux')
+    logfile = os.path.join(tmpdir, 'page.log')
     
-    with open(texfile, 'w') as f:
-        f.write(latex_text)
-    pdflatex(texfile)
+    try:
+        with open(texfile, 'w') as f:
+            f.write(latex_text)
+        pdflatex(texfile)
     
-    with open(pdffile, 'w') as f:
-        output(f.read())
-
-    os.unlink(pdffile)
-    os.unlink(texfile)
-    os.rmdir(tmpdir)
+        with open(pdffile, 'r') as f:
+            output(f.read())
+    finally:
+        #os.unlink(pdffile)
+        #os.unlink(texfile)
+        #os.unlink(auxfile)
+        #os.unlink(logfile)
+        os.rmdir(tmpdir)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
