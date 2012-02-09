@@ -41,9 +41,19 @@ def usage(code=None):
 
 # def format(text): return markdown.markdown(text)
 
+def which(program):
+    which = subprocess.Popen(['which', program], stdout=subprocess.PIPE)
+    out, err = which.communicate()
+    if which.returncode != 0:
+        return False
+    return out.strip()
+
 def format(text):
+    pandoc_path = which('pandoc')
+    if pandoc_path == False:
+        return markdown.markdown(text.decode('utf8')).encode('utf8')
     pandoc = subprocess.Popen(
-        ['pandoc', '--mathml', '-f', 'markdown', '-t', 'html', '-5'], 
+        [pandoc_path, '--mathml', '-f', 'markdown', '-t', 'html', '-5'], 
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = pandoc.communicate(text)
     if pandoc.returncode != 0:
@@ -134,9 +144,9 @@ def main(args):
             usage(error_codes['file_not_found'])
         with open(file_path, 'r') as f:
             text = f.read().strip()
-    text = text.decode('utf8').encode('utf8')
+    text = text
     print header(title, css)
-    print body(text, mark=(not html)).decode('utf8').encode('utf8')
+    print body(text, mark=(not html))
 
 if __name__ == '__main__':
     main(sys.argv[1:])
