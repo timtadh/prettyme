@@ -2,7 +2,7 @@
 # Tim Henderson
 # tim.tadh@gmail.com
 
-import os, sys
+import os, sys, subprocess
 from getopt import getopt, GetoptError
 import markdown
 
@@ -39,7 +39,17 @@ def usage(code=None):
         code = error_codes['usage']
     sys.exit(code)
 
-def format(text): return markdown.markdown(text)
+# def format(text): return markdown.markdown(text)
+
+def format(text):
+    pandoc = subprocess.Popen(
+        ['pandoc', '--mathml', '-f', 'markdown', '-t', 'html', '-5'], 
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = pandoc.communicate(text)
+    if pandoc.returncode != 0:
+        raise RuntimeError, err
+    return out
+
 
 def css(path):
     if path is None:
@@ -124,9 +134,9 @@ def main(args):
             usage(error_codes['file_not_found'])
         with open(file_path, 'r') as f:
             text = f.read().strip()
-    text = text.decode('utf8')
+    text = text.decode('utf8').encode('utf8')
     print header(title, css)
-    print body(text, mark=(not html)).encode('utf8')
+    print body(text, mark=(not html)).decode('utf8').encode('utf8')
 
 if __name__ == '__main__':
     main(sys.argv[1:])
