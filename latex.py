@@ -13,6 +13,8 @@ extended_message = \
 '''Options
     -h, help                      print this message
     -s, stdin                     read from stdin instead of file
+    -b, bib <file>                bibliography file
+    -m, margin <size>             set the page margin
 '''
 
 error_codes = {
@@ -59,20 +61,21 @@ def read_file_or_die(path):
         usage(error_codes['bad_file_read'])
     return s
 
-def latex_header():
+def latex_header(margin):
     return '''
 \\documentclass[12pt]{article}
-\\usepackage[margin=0.8in]{geometry}
+\\usepackage[margin=%s]{geometry}
 \\usepackage{enumerate}
 \\usepackage{amssymb}
 \\usepackage{amsmath}
+\\usepackage{cancel}
+\\usepackage{tabularx}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
 
-
 \\begin{document}
-'''
+''' % (margin,)
 
 def bib_include():
     return '''
@@ -87,6 +90,8 @@ def latex_footer():
 '''
 
 def latex(text):
+    lines = text.split('\n')
+    text = '\n'.join(line for line in lines if not line.startswith('-#-'))
     pandoc = subprocess.Popen(['pandoc', '-f', 'markdown', '-t', 'latex'], 
                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
@@ -117,8 +122,8 @@ def bibtex(path):
 def main(args):
     try:
         opts, args = getopt(args,
-            'hsb:',
-            ['help', 'stdin', 'bib=']
+            'hsb:m:',
+            ['help', 'stdin', 'bib=', 'margin=']
         )
     except GetoptError, err:
         log(err)
@@ -126,6 +131,7 @@ def main(args):
 
     stdin = False
     bib = None
+    margin = '1.0in'
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             usage()
@@ -133,6 +139,8 @@ def main(args):
             stdin = True
         elif opt in ('-b', '--bib'):
             bib = read_file_or_die(assert_file_exists(arg))
+        elif opt in ('-m', '--margin'):
+            margin = arg
 
     if len(args) != 1 and not stdin:
         log('One an only one file is allowed to be built at a time, you gave:')
@@ -155,9 +163,9 @@ def main(args):
     
     text = text.decode('utf8').encode('utf8')
     if bib is None:
-        latex_text = latex_header() + latex(text) + latex_footer()
+        latex_text = latex_header(margin) + latex(text) + latex_footer()
     else:
-        latex_text = latex_header() + latex(text) + bib_include() + latex_footer()
+        latex_text = latex_header(margin) + latex(text) + bib_include() + latex_footer()
     #output(latex_text)
     #sys.exit(0)
    
@@ -197,11 +205,12 @@ def main(args):
         os.unlink(texfile)
         os.unlink(auxfile)
         os.unlink(logfile)
-        os.unlink(bibfile)
-        try: os.unlink(bblfile)
-        except: pass
-        try: os.unlink(blgfile)
-        except: pass
+        if bib:
+            os.unlink(bibfile)
+            try: os.unlink(bblfile)
+            except: pass
+            try: os.unlink(blgfile)
+            except: pass
         os.rmdir(tmpdir)
 
 if __name__ == '__main__':
