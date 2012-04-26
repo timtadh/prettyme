@@ -14,8 +14,12 @@ extended_message = \
     -h, help                      print this message
     -s, stdin                     read from stdin instead of file
     -b, bib <file>                bibliography file
+    --no-bib-include              don't auto include the bib, (simply make it
+                                  available)
     -m, margin <size>             set the page margin
     --multicols                   use 2 cols
+    --append <string>             append the string to the end of the doc after
+                                  the references
 '''
 
 error_codes = {
@@ -36,6 +40,15 @@ def output(s):
     sys.stdout.write(str(s))
     sys.stdout.write('\n')
     sys.stdout.flush()
+
+def usage(code=None):
+    '''Prints the usage and exits with an error code specified by code. If code
+    is not given it exits with error_codes['usage']'''
+    log(usage_message)
+    if code is None:
+        log(extended_message)
+        code = error_codes['usage']
+    sys.exit(code)
 
 def assert_file_exists(path):
     '''checks if the file exists. If it doesn't causes the program to exit.
@@ -88,15 +101,24 @@ def bib_include():
 \\bibliography{bibliography}
 '''
 
-def latex_footer(multicols):
+def latex_footer(multicols, append):
     return '''
 %s
+%s
 \\end{document}
-''' % ('\\end{multicols}' if multicols else '',)
+''' % ('\\end{multicols}' if multicols else '', append)
 
 def latex(text):
+    def process(line):
+        sline = line.strip()
+        if sline.startswith('\\input{') and sline.endswith('}'):
+            fname = sline.replace('\\input{', '').replace('}', '') + '.tex'
+            with open(fname, 'r') as f:
+                text = f.read()
+            return '\n' + latex(text) + '\n'
+        return line
     lines = text.split('\n')
-    text = '\n'.join(line for line in lines if not line.startswith('-#-'))
+    text = '\n'.join(process(line) for line in lines if not line.startswith('-#-'))
     pandoc = subprocess.Popen(['pandoc', '-f', 'markdown', '-t', 'latex'], 
                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
@@ -128,7 +150,8 @@ def main(args):
     try:
         opts, args = getopt(args,
             'hsb:m:',
-            ['help', 'stdin', 'bib=', 'margin=', 'multicols']
+            ['help', 'stdin', 'bib=', 'no-bib-include', 'margin=',
+              'multicols', 'append=']
         )
     except GetoptError, err:
         log(err)
@@ -136,8 +159,10 @@ def main(args):
 
     stdin = False
     bib = None
+    no_bib_include = False
     margin = '1.0in'
     multicols = False
+    append = ''
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             usage()
@@ -145,10 +170,14 @@ def main(args):
             stdin = True
         elif opt in ('-b', '--bib'):
             bib = read_file_or_die(assert_file_exists(arg))
+        elif opt in ('--no-bib-include',):
+            no_bib_include = True
         elif opt in ('-m', '--margin'):
             margin = arg
         elif opt in ('--multicols',):
             multicols = True
+        elif opt in ('--append',):
+            append = arg
 
     if len(args) != 1 and not stdin:
         log('One an only one file is allowed to be built at a time, you gave:')
@@ -170,12 +199,12 @@ def main(args):
             text = f.read().strip()
     
     text = text.decode('utf8').encode('utf8')
-    if bib is None:
+    if bib is None or no_bib_include:
         latex_text = latex_header(margin, multicols) + latex(text) \
-                     + latex_footer(multicols)
+                     + latex_footer(multicols, append)
     else:
         latex_text = latex_header(margin, multicols) + latex(text) \
-                     + bib_include() + latex_footer(multicols)
+                     + bib_include() + latex_footer(multicols, append)
     #output(latex_text)
     #sys.exit(0)
    
