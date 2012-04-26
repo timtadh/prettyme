@@ -15,6 +15,7 @@ extended_message = \
     -s, stdin                     read from stdin instead of file
     -b, bib <file>                bibliography file
     -m, margin <size>             set the page margin
+    --multicols                   use 2 cols
 '''
 
 error_codes = {
@@ -61,7 +62,7 @@ def read_file_or_die(path):
         usage(error_codes['bad_file_read'])
     return s
 
-def latex_header(margin):
+def latex_header(margin, multicols):
     return '''
 \\documentclass[12pt]{article}
 \\usepackage[margin=%s]{geometry}
@@ -70,12 +71,15 @@ def latex_header(margin):
 \\usepackage{amsmath}
 \\usepackage{cancel}
 \\usepackage{tabularx}
+\\usepackage{url}
+\\usepackage{multicol}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
 
 \\begin{document}
-''' % (margin,)
+%s
+''' % (margin, '\\begin{multicols}{2}' if multicols else '')
 
 def bib_include():
     return '''
@@ -84,10 +88,11 @@ def bib_include():
 \\bibliography{bibliography}
 '''
 
-def latex_footer():
+def latex_footer(multicols):
     return '''
+%s
 \\end{document}
-'''
+''' % ('\\end{multicols}' if multicols else '',)
 
 def latex(text):
     lines = text.split('\n')
@@ -123,7 +128,7 @@ def main(args):
     try:
         opts, args = getopt(args,
             'hsb:m:',
-            ['help', 'stdin', 'bib=', 'margin=']
+            ['help', 'stdin', 'bib=', 'margin=', 'multicols']
         )
     except GetoptError, err:
         log(err)
@@ -132,6 +137,7 @@ def main(args):
     stdin = False
     bib = None
     margin = '1.0in'
+    multicols = False
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             usage()
@@ -141,6 +147,8 @@ def main(args):
             bib = read_file_or_die(assert_file_exists(arg))
         elif opt in ('-m', '--margin'):
             margin = arg
+        elif opt in ('--multicols',):
+            multicols = True
 
     if len(args) != 1 and not stdin:
         log('One an only one file is allowed to be built at a time, you gave:')
@@ -163,9 +171,11 @@ def main(args):
     
     text = text.decode('utf8').encode('utf8')
     if bib is None:
-        latex_text = latex_header(margin) + latex(text) + latex_footer()
+        latex_text = latex_header(margin, multicols) + latex(text) \
+                     + latex_footer(multicols)
     else:
-        latex_text = latex_header(margin) + latex(text) + bib_include() + latex_footer()
+        latex_text = latex_header(margin, multicols) + latex(text) \
+                     + bib_include() + latex_footer(multicols)
     #output(latex_text)
     #sys.exit(0)
    
