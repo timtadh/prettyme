@@ -20,6 +20,7 @@ extended_message = \
     --multicols                   use 2 cols
     --append <string>             append the string to the end of the doc after
                                   the references
+    --includedir <dir>            include this as a subdir
 '''
 
 error_codes = {
@@ -49,6 +50,18 @@ def usage(code=None):
         log(extended_message)
         code = error_codes['usage']
     sys.exit(code)
+
+def assert_dir_exists(path):
+    '''checks if a directory exists. if not it creates it. if something exists
+    and it is not a directory it exits with an error.
+    '''
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        os.mkdir(path)
+    elif not os.path.isdir(path):
+        log('Expected a directory found a file. "%(path)s"' % locals())
+        usage(error_codes['file_instead_of_dir'])
+    return path
 
 def assert_file_exists(path):
     '''checks if the file exists. If it doesn't causes the program to exit.
@@ -86,6 +99,7 @@ def latex_header(margin, multicols):
 \\usepackage{tabularx}
 \\usepackage{url}
 \\usepackage{multicol}
+\\usepackage{graphicx}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
@@ -115,8 +129,8 @@ def latex(text):
             fname = sline.replace('\\input{', '').replace('}', '') + '.tex'
             with open(fname, 'r') as f:
                 text = f.read()
-            return '\n' + latex(text) + '\n'
-        return line
+            return '\n' + '\n'.join(process(line) for line in text.split('\n')) + '\n'
+        return line.replace('``', '"').replace("''", '"')
     lines = text.split('\n')
     text = '\n'.join(process(line) for line in lines if not line.startswith('-#-'))
     pandoc = subprocess.Popen(['pandoc', '-f', 'markdown', '-t', 'latex'], 
@@ -151,7 +165,7 @@ def main(args):
         opts, args = getopt(args,
             'hsb:m:',
             ['help', 'stdin', 'bib=', 'no-bib-include', 'margin=',
-              'multicols', 'append=']
+              'multicols', 'append=', 'includedir=']
         )
     except GetoptError, err:
         log(err)
@@ -163,6 +177,7 @@ def main(args):
     margin = '1.0in'
     multicols = False
     append = ''
+    includedirs = list()
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             usage()
@@ -178,6 +193,8 @@ def main(args):
             multicols = True
         elif opt in ('--append',):
             append = arg
+        elif opt in ('--includedir',):
+            includedirs.append(assert_dir_exists(arg))
 
     if len(args) != 1 and not stdin:
         log('One an only one file is allowed to be built at a time, you gave:')
@@ -218,6 +235,9 @@ def main(args):
     bblfile = os.path.join(tmpdir, 'page.bbl')
     blgfile = os.path.join(tmpdir, 'page.blg')
     bibfile = os.path.join(tmpdir, 'bibliography.bib')
+
+    for path in includedirs:
+        subprocess.check_call(['cp', '-r', path, tmpdir])
     
     try:
         with open(texfile, 'w') as f:
@@ -239,6 +259,9 @@ def main(args):
             f.write(latex_text)
         os.chdir(tmpdir)
     finally:
+        for path in includedirs:
+            subprocess.check_call(['rm', '-rf', os.path.join(tmpdir,
+              os.path.basename(path))])
         try: os.unlink(pdffile)
         except: pass
         os.unlink(texfile)
