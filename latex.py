@@ -95,11 +95,14 @@ def latex_header(margin, multicols):
 \\usepackage{enumerate}
 \\usepackage{amssymb}
 \\usepackage{amsmath}
+\\usepackage{amsthm}
 \\usepackage{cancel}
 \\usepackage{tabularx}
 \\usepackage{url}
 \\usepackage{multicol}
 \\usepackage{graphicx}
+\\usepackage[multiple]{footmisc}
+\\usepackage{esint}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
@@ -110,7 +113,6 @@ def latex_header(margin, multicols):
 
 def bib_include():
     return '''
-\\nocite{*}
 \\bibliographystyle{amsalpha}
 \\bibliography{bibliography}
 '''
