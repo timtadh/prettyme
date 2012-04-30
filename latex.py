@@ -100,6 +100,7 @@ def latex_header(margin, multicols):
 \\usepackage{url}
 \\usepackage{multicol}
 \\usepackage{graphicx}
+\\usepackage{subfigure}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
@@ -110,7 +111,6 @@ def latex_header(margin, multicols):
 
 def bib_include():
     return '''
-\\nocite{*}
 \\bibliographystyle{amsalpha}
 \\bibliography{bibliography}
 '''
