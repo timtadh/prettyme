@@ -95,12 +95,15 @@ def latex_header(margin, multicols):
 \\usepackage{enumerate}
 \\usepackage{amssymb}
 \\usepackage{amsmath}
+\\usepackage{amsthm}
 \\usepackage{cancel}
 \\usepackage{tabularx}
 \\usepackage{url}
 \\usepackage{multicol}
 \\usepackage{graphicx}
 \\usepackage{subfigure}
+\\usepackage[multiple]{footmisc}
+\\usepackage{esint}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
