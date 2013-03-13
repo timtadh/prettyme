@@ -21,6 +21,7 @@ extended_message = \
     --append <string>             append the string to the end of the doc after
                                   the references
     --includedir <dir>            include this as a subdir
+    --beamer                      make it a beamer
 '''
 
 error_codes = {
@@ -88,10 +89,24 @@ def read_file_or_die(path):
         usage(error_codes['bad_file_read'])
     return s
 
-def latex_header(margin, multicols):
-    return '''
-\\documentclass[12pt]{article}
-\\usepackage[margin=%s]{geometry}
+def latex_header(doc_class, margin, multicols,beamer=False):
+    if not beamer:
+        dc = '\\' + doc_class
+        dc += '\n\\usepackage[margin=%s]{geometry}\n'
+    else:
+        dc = '''\\documentclass{beamer} %% %s
+\\usefonttheme{serif}
+\\setbeamertemplate{navigation symbols}{} 
+\setbeamertemplate{bibliography item}[text]
+\\usecolortheme[RGB={0,0,0}]{structure} 
+\\usepackage{ragged2e}
+\\justifying''' + ''
+#'''
+#\\usepackage{pgfpages}
+#\\pgfpagesuselayout{2 on 1}[letterpaper,border shrink=5mm]
+#'''
+    
+    header = dc + '''
 \\usepackage{enumerate}
 \\usepackage{amssymb}
 \\usepackage{amsmath}
@@ -104,13 +119,15 @@ def latex_header(margin, multicols):
 \\usepackage{subfigure}
 \\usepackage[multiple]{footmisc}
 \\usepackage{esint}
+\\usepackage{flushend}
 \\makeatletter
 \\def\\imod#1{\\allowbreak\\mkern10mu({\\operator@font mod}\\,\\,#1)}
 \\makeatother
 
 \\begin{document}
 %s
-''' % (margin, '\\begin{multicols}{2}' if multicols else '')
+''' 
+    return header % (margin, '\\begin{multicols}{2}' if multicols else '')
 
 def bib_include():
     return '''
@@ -133,7 +150,31 @@ def latex(text):
             with open(fname, 'r') as f:
                 text = f.read()
             return '\n' + '\n'.join(process(line) for line in text.split('\n')) + '\n'
+        if sline.startswith('--|'):
+            rest = sline.replace('--|', '')
+            ret = '\n.decodeme.' + rest.encode('hex') +'\n'
+            log(ret)
+            return ret
         return line.replace('``', '"').replace("''", '"')
+    def out_process(line):
+        sline = line.strip()
+        if sline.startswith('.decodeme.'):
+            try:
+                rest = sline.replace('.decodeme.', '')
+                return rest.decode('hex')
+            except:
+                log(sline)
+                raise
+        elif sline.startswith('\\begin{enumerate}'):
+            lines = list()
+            lines.append(line)
+            lines.append("\\setlength{\\parskip}{0pt}")
+            lines.append("\\setlength{\\topsep}{0pt}")
+            lines.append("\\setlength{\\partopsep}{-5pt}")
+            lines.append("\\setlength{\\itemsep}{0pt}")
+            lines.append("\\setlength{\\parsep}{0pt}")
+            return "\n".join(lines) + '\n'
+        return line
     lines = text.split('\n')
     text = '\n'.join(process(line) for line in lines if not line.startswith('-#-'))
     pandoc = subprocess.Popen(['pandoc', '-f', 'markdown', '-t', 'latex'], 
@@ -142,7 +183,8 @@ def latex(text):
     out, err = pandoc.communicate(text)
     if pandoc.returncode != 0:
         raise RuntimeError, err
-    return out
+
+    return '\n'.join(out_process(line) for line in out.split('\n'))
 
 def pdflatex(path):
     pdflatex = subprocess.Popen(['pdflatex', path],
@@ -166,9 +208,11 @@ def bibtex(path):
 def main(args):
     try:
         opts, args = getopt(args,
-            'hsb:m:',
+            'hsb:m:d:',
             ['help', 'stdin', 'bib=', 'no-bib-include', 'margin=',
-              'multicols', 'append=', 'includedir=']
+              'multicols', 'append=', 'includedir=', 'beamer',
+              'doc-class=', 'includefile=',
+            ]
         )
     except GetoptError, err:
         log(err)
@@ -181,6 +225,9 @@ def main(args):
     multicols = False
     append = ''
     includedirs = list()
+    includefiles = list()
+    beamer = False
+    doc_class = 'documentclass[12pt]{article}'
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             usage()
@@ -198,6 +245,12 @@ def main(args):
             append = arg
         elif opt in ('--includedir',):
             includedirs.append(assert_dir_exists(arg))
+        elif opt in ('--includefile',):
+            includefiles.append(assert_file_exists(arg))
+        elif opt in ('--beamer',):
+            beamer = True
+        elif opt in ('-d', '--doc-class'):
+            doc_class = arg
 
     if len(args) != 1 and not stdin:
         log('One an only one file is allowed to be built at a time, you gave:')
@@ -220,10 +273,10 @@ def main(args):
     
     text = text.decode('utf8').encode('utf8')
     if bib is None or no_bib_include:
-        latex_text = latex_header(margin, multicols) + latex(text) \
+        latex_text = latex_header(doc_class, margin, multicols, beamer) + latex(text) \
                      + latex_footer(multicols, append)
     else:
-        latex_text = latex_header(margin, multicols) + latex(text) \
+        latex_text = latex_header(doc_class, margin, multicols, beamer) + latex(text) \
                      + bib_include() + latex_footer(multicols, append)
     #output(latex_text)
     #sys.exit(0)
@@ -237,10 +290,16 @@ def main(args):
     logfile = os.path.join(tmpdir, 'page.log')
     bblfile = os.path.join(tmpdir, 'page.bbl')
     blgfile = os.path.join(tmpdir, 'page.blg')
+    navfile = os.path.join(tmpdir, 'page.nav')
+    snmfile = os.path.join(tmpdir, 'page.snm')
+    tocfile = os.path.join(tmpdir, 'page.toc')
     bibfile = os.path.join(tmpdir, 'bibliography.bib')
+    outfile = os.path.join(tmpdir, 'page.out')
 
     for path in includedirs:
         subprocess.check_call(['cp', '-r', path, tmpdir])
+    for path in includefiles:
+        subprocess.check_call(['cp', path, tmpdir])
     
     try:
         with open(texfile, 'w') as f:
@@ -265,11 +324,24 @@ def main(args):
         for path in includedirs:
             subprocess.check_call(['rm', '-rf', os.path.join(tmpdir,
               os.path.basename(path))])
+        for path in includefiles:
+            subprocess.check_call(['rm', '-rf', os.path.join(tmpdir,
+              os.path.basename(path))])
         try: os.unlink(pdffile)
         except: pass
-        os.unlink(texfile)
-        os.unlink(auxfile)
-        os.unlink(logfile)
+        try:os.unlink(texfile)
+        except: pass
+        try:os.unlink(auxfile)
+        except: pass
+        try: os.unlink(logfile)
+        except: pass
+        try: os.unlink(outfile)
+        except: pass
+        try:
+            os.unlink(navfile)
+            os.unlink(snmfile)
+            os.unlink(tocfile)
+        except: pass
         if bib:
             os.unlink(bibfile)
             try: os.unlink(bblfile)

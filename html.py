@@ -2,7 +2,7 @@
 # Tim Henderson
 # tim.tadh@gmail.com
 
-import os, sys, subprocess
+import os, sys, subprocess, re
 from getopt import getopt, GetoptError
 import markdown
 
@@ -27,8 +27,10 @@ error_codes = {
     'args':4,
 }
 
-def log(msg):
-    print msg
+def log(*msgs):
+    for msg in msgs:
+        print >>sys.stderr, msg,
+    print >>sys.stderr
 
 def usage(code=None):
     '''Prints the usage and exits with an error code specified by code. If code
@@ -52,6 +54,16 @@ def format(text):
     pandoc_path = which('pandoc')
     if pandoc_path == False:
         return markdown.markdown(text.decode('utf8')).encode('utf8')
+    def process(line):
+        sline = line.strip()
+        regex = r'\\title\{(.*)\}'
+        match = re.match(regex, sline)
+        log(match, regex, sline)
+        if match:
+            title = match.groups()[0]
+            return "# " + title
+        return line
+    text = '\n'.join(process(line) for line in text.split('\n'))
     pandoc = subprocess.Popen(
         [pandoc_path, '--mathml', '-f', 'markdown', '-t', 'html', '-5'], 
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
