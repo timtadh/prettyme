@@ -96,16 +96,16 @@ def latex_header(doc_class, margin, multicols,beamer=False):
     else:
         dc = '''\\documentclass{beamer} %% %s
 \\usefonttheme{serif}
-\\setbeamertemplate{navigation symbols}{} 
+\\setbeamertemplate{navigation symbols}{}
 \setbeamertemplate{bibliography item}[text]
-\\usecolortheme[RGB={0,0,0}]{structure} 
+\\usecolortheme[RGB={0,0,0}]{structure}
 \\usepackage{ragged2e}
 \\justifying''' + ''
 #'''
 #\\usepackage{pgfpages}
 #\\pgfpagesuselayout{2 on 1}[letterpaper,border shrink=5mm]
 #'''
-    
+
     header = dc + '''
 \\usepackage{enumerate}
 \\usepackage{amssymb}
@@ -126,12 +126,12 @@ def latex_header(doc_class, margin, multicols,beamer=False):
 
 \\begin{document}
 %s
-''' 
+'''
     return header % (margin, '\\begin{multicols}{2}' if multicols else '')
 
 def bib_include():
     return '''
-\\bibliographystyle{amsalpha}
+\\bibliographystyle{acm}
 \\bibliography{bibliography}
 '''
 
@@ -177,7 +177,7 @@ def latex(text):
         return line
     lines = text.split('\n')
     text = '\n'.join(process(line) for line in lines if not line.startswith('-#-'))
-    pandoc = subprocess.Popen(['pandoc', '-f', 'markdown', '-t', 'latex'], 
+    pandoc = subprocess.Popen(['pandoc', '-f', 'markdown', '-t', 'latex'],
                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
     out, err = pandoc.communicate(text)
@@ -270,7 +270,7 @@ def main(args):
             usage(error_codes['file_not_found'])
         with open(file_path, 'r') as f:
             text = f.read().strip()
-    
+
     text = text.decode('utf8').encode('utf8')
     if bib is None or no_bib_include:
         latex_text = latex_header(doc_class, margin, multicols, beamer) + latex(text) \
@@ -280,7 +280,7 @@ def main(args):
                      + bib_include() + latex_footer(multicols, append)
     #output(latex_text)
     #sys.exit(0)
-   
+
     tmpdir = tempfile.mkdtemp()
     mydir = os.getcwd()
     os.chdir(tmpdir)
@@ -300,19 +300,20 @@ def main(args):
         subprocess.check_call(['cp', '-r', path, tmpdir])
     for path in includefiles:
         subprocess.check_call(['cp', path, tmpdir])
-    
+
     try:
         with open(texfile, 'w') as f:
             f.write(latex_text)
         if bib is not None:
             with open(bibfile,'w') as f:
-                f.write(bib)        
+                f.write(bib)
         pdflatex(texfile)
         if bib is not None:
             bibtex('page')
             pdflatex(texfile)
             pdflatex(texfile)
-    
+            pdflatex(texfile)
+
         with open(pdffile, 'r') as f:
             output(f.read())
     except:

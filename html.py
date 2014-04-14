@@ -4,7 +4,7 @@
 
 import os, sys, subprocess, re
 from getopt import getopt, GetoptError
-import markdown
+#import markdown
 
 usage_message = \
 '''usage: html.py --css=style.css file.md'''
